@@ -278,12 +278,13 @@ public class ColorCaptureVis {
         ColorCaptureAI ai = new ColorCaptureAI(r1.nextInt(), 1);
         turnN = 1;
         int timeLeft = TL * 1000;          // keep track only of human player time, and only outside of manual mode
+        ColorCapture cc = new ColorCapture();
         while (!endGame()) {
             String[] board = getBoard();
             // decide which method to call - human or AI - based on turn #
             int player = (turnN - 1) % 2;
             long startTime = System.currentTimeMillis();
-            int color = player == 0 ? makeTurn(board, timeLeft) : ai.makeTurn(board, timeLeft);
+            int color = player == 0 ? cc.makeTurn(board, timeLeft) : ai.makeTurn(board, timeLeft);
             if (player == 0 && !manual) {
                 timeLeft -= (int)(System.currentTimeMillis() - startTime);
                 if (timeLeft < 0) {
