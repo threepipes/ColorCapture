@@ -323,7 +323,9 @@ public class ColorCaptureVis {
 
         System.out.println((turnN - 1) + " turns done.");
         System.out.println("Time left: " + timeLeft + " ms.");
-        return getScore(0);
+        final double score = getScore(0);
+        res.setResult(Integer.parseInt(seed), score);
+        return score;
     }
     catch (Exception e) {
         System.err.println("An exception occurred while trying to get your program's results.");
@@ -502,6 +504,7 @@ public class ColorCaptureVis {
       catch (Exception e) { e.printStackTrace(); }
     }
     // -----------------------------------------
+    static ResultManager res;
     public static void main(String[] args) {
         String seed = "1";
         vis = true;
@@ -533,7 +536,16 @@ public class ColorCaptureVis {
             manual = true;
         if (manual)
             vis = true;
-        ColorCaptureVis f = new ColorCaptureVis(seed);
+        
+        
+        vis = false;
+        final int s = 1;
+        final int t = 10;
+        res = new ResultManager("result.txt", s, t);
+        for(int i=s; i<=t; i++){
+        	new ColorCaptureVis(String.valueOf(i));
+        }
+        res.write();
     }
     // -----------------------------------------
     void addFatalError(String message) {
