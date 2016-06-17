@@ -25,15 +25,23 @@ class ColorCapture {
 	int[] hashMap;
 	Area area;
 	int[] num;
+	boolean collide, greed;
+	int turn = 0;
 	int makeTurn(String[] board, int timeLeftMs) {
 		if(first){
 			first = false;
 			init(board);
 			area.next(0, pc);
+			greed = false;
 		}
-		if(!check(board)){
+		/*if(check(board)){
 			System.err.println("Wrong");
-		}
+			check(board);
+			dump(area.area);
+			System.out.println();
+			dump(used);
+			System.out.println();
+		}*/
 		// have a color as a shifted bit
 		pci = board[0].charAt(0)-'A';
 		pc = 1<<pci;
@@ -41,11 +49,24 @@ class ColorCapture {
 		ec = 1<<eci;
 		nci = 0;
 		while(nci==pci || nci==eci) nci++;
+		collide = false;
 		area.next(1, ec);
+		greed |= collide;
 
 		final int nextColor = getNextColor();
+		if(nextColor>maxColor)
+			System.err.println("Wrong");
 		area.next(0, 1<<nextColor);
+		turn++;
 		return nextColor;
+	}
+	
+	void dump(BitSet bs){
+		for(int i=0; i<D; i++){
+			for(int j=0; j<D; j++){
+				System.out.print(bs.get(i*D+j)?1:0);
+			}System.out.println();
+		}System.out.println();
 	}
 	
 	boolean check(String[] board){
@@ -65,34 +86,65 @@ class ColorCapture {
 			for(int d=0; d<4; d++){
 				final int ny = y+dy[d];
 				final int nx = x+dx[d];
-				if(out(ny, nx) || used.get(ny*D+nx)) continue;
+				if(out(ny, nx) || used.get(ny*D+nx) || mp[ny][nx]!=mp[0][0]) continue;
 				used.set(ny*D+nx);
 				yq[right] = ny;
 				xq[right] = nx;
 				right++;
 			}
 		}
+		/*
+		BitSet border = area.border;
+		for(int i=used.nextSetBit(0); i!=-1; i=used.nextSetBit(i+1)){
+			final int y = i/D;
+			final int x = i%D;
+			for(int d=0; d<4; d++){
+				final int ny = y+dy[d];
+				final int nx = x+dx[d];
+				final int np = ny*D+nx;
+				if(out(ny, nx)
+						|| area.area.get(np)
+						|| area.earea.get(np))
+					continue;
+				if(!border.get(y*D+x)){
+					System.err.println(String.format("(%3d, %3d)", y, x));
+					return false;
+				}
+			}
+		}*/
 		used.flip(0, DD);
-		return !used.intersects(area.area);
+		used.and(area.area);
+		return used.cardinality()>0;
 	}
 
 	int getNextColor(){
 		weightArea = 0.5;
-		if(D<30){
-			return beamSearch(5, 80, 3, true);
-		}
-		else if(D<50){
-			if((double)area.area.cardinality()/DD<0.2)
-				return greedyFarest();
-			return beamSearch(3, 40, 10, true);
-		}
-		else{
+//		if(D*maxColor==100 || maxColor==4){
+//			return beamSearch(10, 100, 10, true);
+//		}
+//		else if(D*maxColor<200){
+//			if((double)area.area.cardinality()/DD<0.2)
+//				return greedyFarest();
+//			return beamSearch(3, 40, 10, true);
+//		}
+//		else{
 //			weightArea = area.area.cardinality()/DD;
 			return greedyFarest();
-		}
+//		}
 	}
 	
+	int farPos;
+	boolean wing;
+	int line;
+	double coef;
 	int greedyFarest(){
+		if(!wing && !greed && farPos/(2.0*D)>=coef){
+			wing = true;
+//			System.err.println("wing open");
+		}
+//		if(greed){
+//			wing = false;
+//		}
 		return area.farestColor();
 	}
 
@@ -124,7 +176,7 @@ class ColorCapture {
 		int vc = cur.validColors(0);
 		// search all. so if time complexity is large, select at random.
 		for(int i=0; i<=maxColor; i++){
-			if((vc&1<<i)==0) continue;
+			if((vc&1<<i)==0 || i==pci || i==eci) continue;
 			Area newArea = cur.getCopy();
 			newArea.next(0, 1<<i);
 			if(moveEnemy){
@@ -147,6 +199,7 @@ class ColorCapture {
 		D = board.length;
 		DD = D*D;
 		DD2 = sq(D*2);
+		wing = false;
 		yq = new int[DD];
 		xq = new int[DD];
 		used = new BitSet(DD);
@@ -161,6 +214,9 @@ class ColorCapture {
 				maxColor = Math.max(maxColor, cmap[i][j]);
 			}
 		}
+		coef = 0.52;
+		if(maxColor<=6) coef = 0.4;
+		line = (int)(D*coef);
 		hashMap = new int[DD];
 		for(int i=0; i<DD; i++){
 			hashMap[i] = r.nextInt();
@@ -226,7 +282,8 @@ class ColorCapture {
 		}
 		
 		int farestColor(){
-			long dist = 0;
+			long dist = Integer.MIN_VALUE;
+			int distI = 0;
 			int color = nci;
 			for(int i=border.nextSetBit(0); i!=-1; i=border.nextSetBit(i+1)){
 				final int y = i/D;
@@ -241,13 +298,17 @@ class ColorCapture {
 							|| cmap[ny][nx]==pci
 							|| cmap[ny][nx]==eci)
 						continue;
-					long nd = ny*ny+nx*nx+DD-sq(nx-ny);
+					long nd;
+					if(!wing) nd = ny*ny+nx*nx+DD-sq(nx-ny);
+					else nd = -(Math.abs(Math.min(ny, nx)-line));
 					if(nd>dist){
 						dist = nd;
+						distI = ny+nx;
 						color = cmap[ny][nx];
 					}
 				}
 			}
+			farPos = distI;
 			return color;
 		}
 
@@ -295,20 +356,34 @@ class ColorCapture {
 		 * @param earea		opponent player's area
 		 */
 		private void next(int color, BitSet area, BitSet border, BitSet earea){
+			left = right = 0;
 			for(int i=border.nextSetBit(0); i!=-1; i=border.nextSetBit(i+1)){
-				final int y = i/D;
-				final int x = i%D;
+				yq[right] = i/D;
+				xq[right] = i%D;
+				right++;
+			}
+			while(left<right){
+				final int y = yq[left];
+				final int x = xq[left];
+				left++;
 				for(int d=0; d<4; d++){
 					final int ny = y+dy[d];
 					final int nx = x+dx[d];
 					final int np = ny*D+nx;
 					if(out(ny, nx)
 							|| area.get(np)
-							|| earea.get(np)
-							|| map[ny][nx]!=color)
+							|| map[ny][nx]!=color){
 						continue;
+					}
+					if(earea.get(np)){
+						collide = true;
+						continue;
+					}
 					border.set(np);
 					area.set(np);
+					yq[right] = ny;
+					xq[right] = nx;
+					right++;
 				}
 			}
 			bfsForInnerArea(border, area, earea);

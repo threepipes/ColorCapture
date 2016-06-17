@@ -209,6 +209,10 @@ public class ColorCaptureVis {
         r1.setSeed(seed);
         D = r1.nextInt(maxSize - minSize + 1) + minSize;
         C = r1.nextInt(maxColors - minColors + 1) + minColors;
+        if(C<minColors){
+        	System.err.println("Color is small");
+        	C = minColors;
+        }
         if (seed <= 3) {
             D = minSize * (int)seed;
             C = minColors + 2 * (int)(seed - 1);
@@ -506,11 +510,11 @@ public class ColorCaptureVis {
     // -----------------------------------------
     static ResultManager res;
     public static void main(String[] args) {
-        String seed = "1";
+        String seed = "4";
         vis = true;
         manual = false;
-        del = 50;
-        SZ = 5;
+        del = 20;
+        SZ = 10;
         TL = 10;
         for (int i = 0; i<args.length; i++)
         {   if (args[i].equals("-seed"))
@@ -539,8 +543,8 @@ public class ColorCaptureVis {
         
         
         vis = false;
-        final int s = 1;
-        final int t = 10;
+        final int s = 161;
+        final int t = 200;
         res = new ResultManager("result.txt", s, t);
         for(int i=s; i<=t; i++){
         	new ColorCaptureVis(String.valueOf(i));
