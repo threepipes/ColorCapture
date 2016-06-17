@@ -14,7 +14,7 @@ class ColorCapture {
 	int[][] map;
 	int[][] cmap;
 	int D, DD;
-	int pc, ec, nc;
+	int pc, ec, pci, eci, nci;
 	int maxColor;
 	final int[] dy = {0, 1, 0, -1};
 	final int[] dx = {-1, 0, 1, 0};
@@ -24,19 +24,21 @@ class ColorCapture {
 	int[] num;
 	int makeTurn(String[] board, int timeLeftMs) {
 		// have a color as a shifted bit
-		pc = 1<<board[0].charAt(0)-'A';
-		ec = 1<<board[D-1].charAt(D-1)-'A';
-		nc = 0;
-		while(nc==pc || nc==ec) nc++;
 		if(first){
 			first = false;
 			init(board);
 			area.next(0, pc);
 		}
+		pci = board[0].charAt(0)-'A';
+		pc = 1<<pci;
+		eci = board[D-1].charAt(D-1)-'A';
+		ec = 1<<eci;
+		nci = 0;
+		while(nci==pci || nci==eci) nci++;
 		area.next(1, ec);
 
 		final int nextColor = getNextColor();
-		area.next(0, nextColor);
+		area.next(0, 1<<nextColor);
 		return nextColor;
 	}
 
@@ -58,7 +60,7 @@ class ColorCapture {
 			qu = nq; nq = tmp;
 		}
 		if(qu.isEmpty()){
-			return nc;
+			return nci;
 		}
 		Entry<Area, Integer> best = qu.pollFirstEntry();
 		return best.getValue();
@@ -245,8 +247,8 @@ class ColorCapture {
 					boolean haveUncontrolled = false;
 					for(int e=0; e<4; e++){
 						final int nny = ny+dy[d];
-						final int nnx = ny+dx[d];
-						if(!out(ny, nx) && !area.get(nny*D+nnx)){
+						final int nnx = nx+dx[d];
+						if(!out(nny, nnx) && !area.get(nny*D+nnx)){
 							haveUncontrolled = true;
 							break;
 						}

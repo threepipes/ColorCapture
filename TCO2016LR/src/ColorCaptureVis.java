@@ -509,7 +509,7 @@ public class ColorCaptureVis {
         String seed = "1";
         vis = true;
         manual = false;
-        del = 100;
+        del = 50;
         SZ = 10;
         TL = 10;
         for (int i = 0; i<args.length; i++)
