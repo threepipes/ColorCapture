@@ -13,7 +13,10 @@ class ColorCapture {
 	}
 	int[][] map;
 	int[][] cmap;
-	int D, DD;
+	int[] yq, xq;
+	int right, left;
+	BitSet used;
+	int D, DD, DD2;
 	int pc, ec, pci, eci, nci;
 	int maxColor;
 	final int[] dy = {0, 1, 0, -1};
@@ -23,12 +26,15 @@ class ColorCapture {
 	Area area;
 	int[] num;
 	int makeTurn(String[] board, int timeLeftMs) {
-		// have a color as a shifted bit
 		if(first){
 			first = false;
 			init(board);
 			area.next(0, pc);
 		}
+		if(!check(board)){
+			System.err.println("Wrong");
+		}
+		// have a color as a shifted bit
 		pci = board[0].charAt(0)-'A';
 		pc = 1<<pci;
 		eci = board[D-1].charAt(D-1)-'A';
@@ -41,9 +47,53 @@ class ColorCapture {
 		area.next(0, 1<<nextColor);
 		return nextColor;
 	}
+	
+	boolean check(String[] board){
+		char[][] mp = new char[D][D];
+		for(int i=0; i<D; i++){
+			mp[i] = board[i].toCharArray();
+		}
+		left = 0; right = 1;
+		yq[0] = 0;
+		xq[0] = 0;
+		used.clear();
+		used.set(0);
+		while(left<right){
+			final int y = yq[left];
+			final int x = xq[left];
+			left++;
+			for(int d=0; d<4; d++){
+				final int ny = y+dy[d];
+				final int nx = x+dx[d];
+				if(out(ny, nx) || used.get(ny*D+nx)) continue;
+				used.set(ny*D+nx);
+				yq[right] = ny;
+				xq[right] = nx;
+				right++;
+			}
+		}
+		used.flip(0, DD);
+		return !used.intersects(area.area);
+	}
 
 	int getNextColor(){
-		return beamSearch(3, 40, 10, true);
+		weightArea = 0.5;
+		if(D<30){
+			return beamSearch(5, 80, 3, true);
+		}
+		else if(D<50){
+			if((double)area.area.cardinality()/DD<0.2)
+				return greedyFarest();
+			return beamSearch(3, 40, 10, true);
+		}
+		else{
+//			weightArea = area.area.cardinality()/DD;
+			return greedyFarest();
+		}
+	}
+	
+	int greedyFarest(){
+		return area.farestColor();
 	}
 
 	int beamSearch(int turn, int wid, int decreseRate, boolean moveEnemy){
@@ -96,6 +146,10 @@ class ColorCapture {
 	void init(String[] board){
 		D = board.length;
 		DD = D*D;
+		DD2 = sq(D*2);
+		yq = new int[DD];
+		xq = new int[DD];
+		used = new BitSet(DD);
 		char[][] tmp = new char[D][D];
 		map = new int[D][D];
 		cmap = new int[D][D];
@@ -114,10 +168,11 @@ class ColorCapture {
 		num = new int[maxColor+1];
 		area = new Area();
 	}
-
+	static double weightArea = 0;
 	class Area implements Comparable<Area>{
 		BitSet area, border, earea, eborder;
-		int pc, ec, size;
+		int pc, ec;
+		double score;
 		int hash;
 		public Area() {
 			area = new BitSet(DD);
@@ -126,25 +181,24 @@ class ColorCapture {
 			eborder = new BitSet(DD);
 			area.set(0); border.set(0);
 			earea.set(DD-1); eborder.set(DD-1);
-			size = 1;
+			score = 0;
 		}
-		public Area(BitSet a, BitSet b, BitSet ea, BitSet eb, int pc, int ec, int size){
+		public Area(BitSet a, BitSet b, BitSet ea, BitSet eb, int pc, int ec){
 			area = a;
 			earea = ea;
 			border = b;
 			eborder = eb;
 			this.pc = pc;
 			this.ec = ec;
-			this.size = size;
 		}
 		Area getCopy(){
 			return new Area((BitSet)area.clone(), (BitSet)border.clone()
-					, (BitSet)earea.clone(), (BitSet)eborder.clone(), pc, ec, size);
+					, (BitSet)earea.clone(), (BitSet)eborder.clone(), pc, ec);
 		}
 
 		int validColors(int player){
-			if(player==0) return validColors(area, pc, ec);
-			else return validColors(earea, ec, pc);
+			if(player==0) return validColors(area, earea, pc, ec);
+			else return validColors(earea, area, ec, pc);
 		}
 		/**
 		 * get colors next to player's area
@@ -152,7 +206,7 @@ class ColorCapture {
 		 * @param pc	current player's color
 		 * @param ec	opponent's color
 		 */
-		private int validColors(BitSet area, int pc, int ec){
+		private int validColors(BitSet area, BitSet earea, int pc, int ec){
 			int res = 0;
 			for(int i=border.nextSetBit(0); i!=-1; i=border.nextSetBit(i+1)){
 				final int y = i/D;
@@ -170,15 +224,41 @@ class ColorCapture {
 			}
 			return res & ~pc & ~ec;
 		}
+		
+		int farestColor(){
+			long dist = 0;
+			int color = nci;
+			for(int i=border.nextSetBit(0); i!=-1; i=border.nextSetBit(i+1)){
+				final int y = i/D;
+				final int x = i%D;
+				for(int d=0; d<4; d++){
+					final int ny = y+dy[d];
+					final int nx = x+dx[d];
+					final int np = ny*D+nx;
+					if(out(ny, nx)
+							|| area.get(np)
+							|| earea.get(np)
+							|| cmap[ny][nx]==pci
+							|| cmap[ny][nx]==eci)
+						continue;
+					long nd = ny*ny+nx*nx+DD-sq(nx-ny);
+					if(nd>dist){
+						dist = nd;
+						color = cmap[ny][nx];
+					}
+				}
+			}
+			return color;
+		}
 
 		void validColors(int player, int[] num){
-			if(player==0) validColors(area, pc, ec, num);
-			else validColors(area, ec, pc, num);
+			if(player==0) validColors(area, earea, pc, ec, num);
+			else validColors(earea, area, ec, pc, num);
 		}
 		/**
 		 * count validColors in num[]
 		 */
-		private void validColors(BitSet area, int pc, int ec, int[] num){
+		private void validColors(BitSet area, BitSet earea, int pc, int ec, int[] num){
 			Arrays.fill(num, 0);
 			for(int i=border.nextSetBit(0); i!=-1; i=border.nextSetBit(i+1)){
 				final int y = i/D;
@@ -200,6 +280,7 @@ class ColorCapture {
 			if(player==0){
 				pc = color;
 				next(color, area, border, earea);
+				culcScore();
 			}else{
 				ec = color;
 				next(color, earea, eborder, area);
@@ -212,7 +293,6 @@ class ColorCapture {
 		 * @param area		current player's area
 		 * @param border	current player's border
 		 * @param earea		opponent player's area
-		 * 
 		 */
 		private void next(int color, BitSet area, BitSet border, BitSet earea){
 			for(int i=border.nextSetBit(0); i!=-1; i=border.nextSetBit(i+1)){
@@ -229,49 +309,73 @@ class ColorCapture {
 						continue;
 					border.set(np);
 					area.set(np);
-					size++;
 				}
 			}
+			bfsForInnerArea(border, area, earea);
+		}
+		void bfsForInnerArea(BitSet border, BitSet area, BitSet earea){
 			hash = 0;
 			for(int i=border.nextSetBit(0); i!=-1; i=border.nextSetBit(i+1)){
 				final int y = i/D;
 				final int x = i%D;
 				int adj = 0;
-				for(int d=0; d<4; d++){
+				out:for(int d=0; d<4; d++){
 					final int ny = y+dy[d];
 					final int nx = x+dx[d];
 					final int np = ny*D+nx;
 					if(out(ny, nx) || earea.get(np) || area.get(np))
 						continue;
 					adj++;
-					boolean haveUncontrolled = false;
-					for(int e=0; e<4; e++){
-						final int nny = ny+dy[d];
-						final int nnx = nx+dx[d];
-						if(!out(nny, nnx) && !area.get(nny*D+nnx)){
-							haveUncontrolled = true;
-							break;
+					used.clear();
+					left = 0;
+					right = 1;
+					yq[0] = ny;
+					xq[0] = nx;
+					used.set(np);
+					while(left<right){
+						final int py = yq[left];
+						final int px = xq[left];
+						left++;
+						for(int e=0; e<4; e++){
+							final int nny = py+dy[e];
+							final int nnx = px+dx[e];
+							final int nnp = nny*D+nnx;
+							if(out(nny, nnx) || used.get(nnp) || area.get(nnp)) continue;
+							if(earea.get(nnp)) break out;
+							used.set(nnp);
+							yq[right] = nny;
+							xq[right] = nnx;
+							right++;
 						}
 					}
-					if(!haveUncontrolled){
-						border.set(np);
-						area.set(np);
-						size++;
-					}
+					area.or(used);
 				}
 				if(adj==0) border.clear(y*D+x);
 				else hash ^= hashMap[y*D+x];
 			}
 		}
+		void culcScore(){
+			for(int i=border.nextSetBit(0); i!=-1; i=border.nextSetBit(i+1)){
+				final int y = i/D;
+				final int x = i%D;
+				score += sq(y+x)/DD2;
+			}
+			score /= (border.cardinality())*(1-weightArea);
+			score += (double)area.cardinality()/DD*weightArea;
+		}
 		@Override
 		public int compareTo(Area o) {
-			if(o.size != size) return o.size-size;
+			if(o.score != score) return Double.compare(o.score, score);
 			return o.hash-hash;
 		}
 		@Override
 		public int hashCode() {
 			return hash;
 		}
+	}
+	
+	int sq(int a){
+		return a*a;
 	}
 
 	boolean out(int y, int x){

@@ -285,7 +285,7 @@ public class ColorCaptureVis {
             int player = (turnN - 1) % 2;
             long startTime = System.currentTimeMillis();
             int color = player == 0 ? cc.makeTurn(board, timeLeft) : ai.makeTurn(board, timeLeft);
-            if (player == 0 && !manual) {
+            if (player == 0) {
                 timeLeft -= (int)(System.currentTimeMillis() - startTime);
                 if (timeLeft < 0) {
                     addFatalError("Turn #" + turnN + ": time limit exceeded.");
@@ -431,7 +431,7 @@ public class ColorCaptureVis {
                 }
 
             // palette of colors on the side to switch to in manual mode (in case there are no options available on the field)
-            // in a 5 x 5 block of size SZ
+            // in a 5 x 5 block of score SZ
             if (manual)
                 for (int i = 0; i < C; ++i) {
                     g2.setColor(colors[i]);
@@ -510,7 +510,7 @@ public class ColorCaptureVis {
         vis = true;
         manual = false;
         del = 50;
-        SZ = 10;
+        SZ = 5;
         TL = 10;
         for (int i = 0; i<args.length; i++)
         {   if (args[i].equals("-seed"))
@@ -523,7 +523,7 @@ public class ColorCaptureVis {
                 vis = false;
             if (args[i].equals("-manual"))
                 manual = true;
-            if (args[i].equals("-size"))
+            if (args[i].equals("-score"))
                 SZ = Integer.parseInt(args[++i]);
             if (args[i].equals("-debug"))
                 debug = true;
